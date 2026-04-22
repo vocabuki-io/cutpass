@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かっとぱす！— ステッカーのカットパスを自動出力</title>
+<meta name="description" content="画像をアップロードするだけでステッカー用カットパスを自動生成、PSD形式で出力！">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@300;400;700;900&display=swap');
+
+:root {
+  --bg: #f5f0e8;
+  --ink: #1a1410;
+  --ink2: #5a5040;
+  --accent: #e8380d;
+  --accent2: #f5a623;
+  --surface: #ffffff;
+  --border: #d4c8b0;
+  --border2: #e8dece;
+  --mono: 'DM Mono', monospace;
+  --sans: 'Zen Kaku Gothic New', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:0;
+}
+
+/* ── Header ── */
+header {
+  position: relative; z-index:10;
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid var(--ink);
+  background: var(--surface);
+  gap: 0;
+}
+
+.logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.logo-scissors {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.logo-scissors::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; right: -4px;
+  width: 14px; height: 14px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+}
+
+.logo-title {
+  font-family: var(--sans);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.logo-title em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.logo-tagline {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink2);
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.header-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  margin: 0 20px;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Lang switcher ── */
+.lang-switcher {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.lang-btn {
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink2);
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+
+.lang-btn.active {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* Support button in header */
+.btn-support-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.btn-support-header:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.step-indicator {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.step-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.step-dot.done { background: var(--accent); }
+.step-dot.active { background: var(--ink); }
+
+/* ── Layout ── */
+
+/* ═══════════════════════════════════════
+   APP PAGE
+═══════════════════════════════════════ */
+#appPage {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  height: calc(100vh - 64px);
+}
+
+.sidebar {
+  border-right: 2px solid var(--ink);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  padding: 20px 20px;
+  border-bottom: 1px solid var(--border2);
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--ink2);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-label::before {
+  content: attr(data-num);
+  display: inline-flex;
+  width: 18px; height: 18px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 9px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  background: var(--bg);
+}
+
+.dropzone:hover, .dropzone.over {
+  border-color: var(--accent);
+  background: #fef8f5;
+}
+
+.dropzone input[type=file] {
+  position: absolute; inset:0;
+  opacity:0; cursor:pointer; width:100%; height:100%;
+}
+
+.dz-icon { font-size: 28px; margin-bottom: 8px; display: block; opacity: 0.4; }
+.dz-main { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+.dz-sub { font-size: 11px; color: var(--ink2); font-family: var(--mono); }
+
+.img-thumb {
+  display: none;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 0 / 10px 10px;
+}
+
+.img-thumb img {
+  width: 100%;
+  display: block;
+  max-height: 100px;
+  object-fit: contain;
+}
+
+.img-thumb-info {
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink2);
+  background: rgba(255,255,255,0.9);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.cut-style-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.cut-card {
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  background: var(--bg);
+  position: relative;
+}
+
+.cut-card:hover { border-color: var(--ink2); }
+
+.cut-card.selected {
+  border-color: var(--accent);
+  background: #fff8f5;
+}
+
+.cut-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 5px; right: 7px;
+  font-size: 9px;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.cut-card-icon { font-size: 20px; margin-bottom: 4px; }
+.cut-card-name { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+.cut-card-desc { font-family: var(--mono); font-size: 9px; color: var(--ink2); line-height: 1.4; }
+
+.slider-group { margin-top: 12px; }
+.slider-row { margin-bottom: 12px; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.slider-name { font-size: 11px; font-weight: 700; }
+
+.slider-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: #fff4f0;
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+
+input[type=range] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--ink);
+  cursor: pointer;
+}
+
+.layer-stack { display: flex; flex-direction: column; gap: 5px; }
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.layer-thumb {
+  width: 28px; height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.layer-name { flex: 1; font-weight: 700; font-size: 11px; }
+
+.layer-type {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink2);
+  background: var(--border2);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.btn-gen {
+  margin: 0 20px 20px;
+  padding: 16px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: calc(100% - 40px);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.btn-gen:hover:not(:disabled) {
+  background: var(--accent);
+  box-shadow: 0 4px 16px rgba(232,56,13,0.3);
+}
+
+.btn-gen:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn-gen .spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+
+.btn-gen.loading .spinner { display: block; }
+.btn-gen.loading .btn-label { display: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Preview */
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-toolbar {
+  padding: 0 24px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.toolbar-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink2);
+  text-transform: uppercase;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.vtab {
+  padding: 4px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink2);
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+
+.vtab.active { background: var(--ink); color: var(--bg); }
+
+.zoom-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-btn {
+  width: 24px; height: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink2);
+  transition: all 0.15s;
+}
+
+.zoom-btn:hover { border-color: var(--ink); color: var(--ink); }
+
+.zoom-val {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  min-width: 36px;
+  text-align: center;
+}
+
+.canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: repeating-conic-gradient(#ddd 0% 25%, #f0ece4 0% 50%) 0 0 / 20px 20px;
+  position: relative;
+}
+
+#previewCanvas {
+  display: none;
+  border-radius: 2px;
+  box-shadow: 0 8px 40px rgba(26,20,16,0.25), 0 2px 8px rgba(26,20,16,0.15);
+  transform-origin: center;
+  transition: transform 0.2s;
+}
+
+.empty-placeholder { text-align: center; pointer-events: none; }
+.empty-ph-icon { font-size: 56px; opacity: 0.15; margin-bottom: 14px; display: block; }
+.empty-ph-text { font-size: 13px; color: var(--ink2); opacity: 0.6; line-height: 1.8; }
+
+.bottom-bar {
+  height: 40px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.status-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+}
+
+.status-led {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s;
+}
+
+.status-led.ready { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.status-led.working { background: var(--accent2); animation: blink 0.6s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.stat-item {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+
+.stat-item span { color: var(--ink); }
+
+.btn-dl-psd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+}
+
+.btn-dl-psd:hover:not(:disabled) {
+  background: #c42c08;
+  box-shadow: 0 2px 12px rgba(232,56,13,0.4);
+}
+
+.btn-dl-psd:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.psd-badge {
+  background: rgba(255,255,255,0.25);
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 9px;
+}
+
+/* ═══════════════════════════════════════
+   SUPPORT SECTION (always visible below app)
+═══════════════════════════════════════ */
+#supportSection {
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
+  border-top: 3px solid var(--ink);
+}
+
+.support-hero {
+  text-align: center;
+  padding: 60px 24px 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.support-emoji {
+  font-size: 56px;
+  margin-bottom: 20px;
+  display: block;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.support-title {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.support-title em { color: var(--accent); font-style: normal; }
+
+.support-sub {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+
+.support-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  opacity: 0.7;
+}
+
+/* Cards */
+.support-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 24px 60px;
+}
+
+.support-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 28px 24px;
+  text-align: center;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.support-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform 0.2s;
+}
+
+.support-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px rgba(232,56,13,0.1);
+  transform: translateY(-2px);
+}
+
+.support-card:hover::before { transform: scaleX(1); }
+
+.support-card-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+
+.badge-once {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+}
+
+.badge-monthly {
+  background: #fce4ec;
+  color: #c2185b;
+  border: 1px solid #f48fb1;
+}
+
+.support-card-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+
+.support-card-title {
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.support-card-desc {
+  font-size: 12px;
+  color: var(--ink2);
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+.support-card-price {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.support-card-price-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  margin-bottom: 20px;
+}
+
+.btn-stripe {
+  width: 100%;
+  padding: 13px 16px;
+  border: none;
+  border-radius: 5px;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+}
+
+.btn-stripe-once {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.btn-stripe-once:hover {
+  background: var(--accent);
+  box-shadow: 0 4px 16px rgba(232,56,13,0.3);
+}
+
+.btn-stripe-monthly {
+  background: linear-gradient(135deg, #e8380d, #ff6b35);
+  color: white;
+}
+
+.btn-stripe-monthly:hover {
+  box-shadow: 0 4px 20px rgba(232,56,13,0.4);
+  transform: translateY(-1px);
+}
+
+.stripe-lock {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.support-footer {
+  text-align: center;
+  padding: 0 24px 40px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.support-footer-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  line-height: 1.8;
+  opacity: 0.7;
+}
+
+.stripe-info-box {
+  max-width: 600px;
+  margin: 0 auto 40px;
+  padding: 0 24px;
+}
+
+.stripe-info {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stripe-info-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+
+.stripe-info-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink2);
+  line-height: 1.7;
+}
+
+.stripe-info-text strong { color: var(--ink); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 10px 20px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.3s;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo-scissors">✂️</div>
+    <div>
+      <div class="logo-title" id="headerTitle">かっとぱす<em>！</em></div>
+      <div class="logo-tagline" id="headerTagline">ステッカーのカットパスを自動出力</div>
+    </div>
+  </div>
+
+  <div class="header-divider"></div>
+
+  <div class="header-right">
+    <!-- Step indicator (app only) -->
+    <div class="step-indicator" id="stepIndicator">
+      <div class="step-dot" id="sd1"></div>
+      <div class="step-dot" id="sd2"></div>
+      <div class="step-dot" id="sd3"></div>
+    </div>
+
+    <!-- Lang switcher -->
+    <div class="lang-switcher">
+      <button class="lang-btn active" onclick="setLang('ja')">JP</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════
+     APP
+══════════════════════════════════════ -->
+<div id="appPage">
+
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <div class="section-label" data-num="1" id="label1">画像をアップロード</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif">
+        <span class="dz-icon">🖼</span>
+        <div class="dz-main" id="dzMain">ドラッグ＆ドロップ</div>
+        <div class="dz-sub" id="dzSub">PNG / JPG / WebP<br>透過PNG推奨</div>
+      </div>
+      <div class="img-thumb" id="imgThumb">
+        <img id="thumbImg" src="" alt="">
+        <div class="img-thumb-info">
+          <span id="thumbSize">—</span>
+          <span id="thumbFmt">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label" data-num="2" id="label2">カットスタイル</div>
+      <div class="cut-style-grid">
+        <div class="cut-card selected" data-style="tight" onclick="selectStyle(this,'tight')">
+          <div class="cut-card-icon">⬛</div>
+          <div class="cut-card-name" data-i18n="styleTight">タイト</div>
+          <div class="cut-card-desc" data-i18n="styleTightDesc">輪郭ぴったり<br>高精度トレース</div>
+        </div>
+        <div class="cut-card" data-style="bleed" onclick="selectStyle(this,'bleed')">
+          <div class="cut-card-icon">◻️</div>
+          <div class="cut-card-name" data-i18n="styleBleed">余白あり</div>
+          <div class="cut-card-desc" data-i18n="styleBleedDesc">ブリード拡張<br>安全マージン付き</div>
+        </div>
+        <div class="cut-card" data-style="round" onclick="selectStyle(this,'round')">
+          <div class="cut-card-icon">🔵</div>
+          <div class="cut-card-name" data-i18n="styleRound">角丸</div>
+          <div class="cut-card-desc" data-i18n="styleRoundDesc">丸みのある<br>やさしい輪郭</div>
+        </div>
+        <div class="cut-card" data-style="rect" onclick="selectStyle(this,'rect')">
+          <div class="cut-card-icon">▬</div>
+          <div class="cut-card-name" data-i18n="styleRect">矩形</div>
+          <div class="cut-card-desc" data-i18n="styleRectDesc">バウンディング<br>ボックス</div>
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-row" id="rowBleed" style="display:none">
+          <div class="slider-label">
+            <span class="slider-name" data-i18n="sliderBleed">拡張量（ブリード）</span>
+            <span class="slider-val" id="valBleed">8px</span>
+          </div>
+          <input type="range" id="rBleed" min="2" max="40" value="8"
+            oninput="document.getElementById('valBleed').textContent=this.value+'px'; scheduleRegen()">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">
+            <span class="slider-name" data-i18n="sliderAlpha">アルファ閾値</span>
+            <span class="slider-val" id="valAlpha">15</span>
+          </div>
+          <input type="range" id="rAlpha" min="1" max="250" value="15"
+            oninput="document.getElementById('valAlpha').textContent=this.value; scheduleRegen()">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">
+            <span class="slider-name" data-i18n="sliderSmooth">パスの滑らかさ</span>
+            <span class="slider-val" id="valSmooth">8</span>
+          </div>
+          <input type="range" id="rSmooth" min="1" max="30" value="8"
+            oninput="document.getElementById('valSmooth').textContent=this.value; scheduleRegen()">
+        </div>
+        <div class="slider-row" id="rowCorner" style="display:none">
+          <div class="slider-label">
+            <span class="slider-name" data-i18n="sliderCorner">角丸の半径</span>
+            <span class="slider-val" id="valCorner">20px</span>
+          </div>
+          <input type="range" id="rCorner" min="5" max="80" value="20"
+            oninput="document.getElementById('valCorner').textContent=this.value+'px'; scheduleRegen()">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">
+            <span class="slider-name" data-i18n="sliderStroke">パスの線幅</span>
+            <span class="slider-val" id="valStroke">3px</span>
+          </div>
+          <input type="range" id="rStroke" min="1" max="10" value="3"
+            oninput="document.getElementById('valStroke').textContent=this.value+'px'; scheduleRegen()">
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label" data-num="3" id="label3">PSDレイヤー構成</div>
+      <div class="layer-stack">
+        <div class="layer-item">
+          <canvas class="layer-thumb" width="28" height="20"
+            style="background:repeating-linear-gradient(45deg,#e8380d 0 2px,transparent 0 6px);opacity:0.7"></canvas>
+          <span class="layer-name" data-i18n="layerCut">カットパス</span>
+          <span class="layer-type">VECTOR</span>
+        </div>
+        <div class="layer-item">
+          <canvas class="layer-thumb" width="28" height="20"
+            style="background:repeating-conic-gradient(#ccc 0% 25%,#fff 0% 50%) 0 0/6px 6px"></canvas>
+          <span class="layer-name" data-i18n="layerOrig">元画像</span>
+          <span class="layer-type">RASTER</span>
+        </div>
+        <div class="layer-item" style="opacity:0.4">
+          <canvas class="layer-thumb" width="28" height="20" style="background:#fff"></canvas>
+          <span class="layer-name" data-i18n="layerBg">背景</span>
+          <span class="layer-type">WHITE</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <button class="btn-gen" id="genBtn" onclick="generate()" disabled>
+      <div class="spinner"></div>
+      <span class="btn-label" data-i18n="genBtn">▶ カットパスを生成</span>
+    </button>
+
+  </div><!-- /sidebar -->
+
+  <!-- Preview -->
+  <div class="preview-pane">
+    <div class="preview-toolbar">
+      <span class="toolbar-label" data-i18n="preview">プレビュー</span>
+      <div class="view-tabs">
+        <button class="vtab active" onclick="setView('overlay',this)" data-i18n="viewOverlay">OVERLAY</button>
+        <button class="vtab" onclick="setView('image',this)" data-i18n="viewImage">IMAGE</button>
+        <button class="vtab" onclick="setView('path',this)" data-i18n="viewPath">PATH</button>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoom(-0.25)">−</button>
+        <span class="zoom-val" id="zoomVal">100%</span>
+        <button class="zoom-btn" onclick="zoom(0.25)">+</button>
+        <button class="zoom-btn" onclick="resetZoom()">⊡</button>
+      </div>
+    </div>
+
+    <div class="canvas-area">
+      <div class="empty-placeholder" id="emptyPh">
+        <span class="empty-ph-icon">✂️</span>
+        <div class="empty-ph-text" id="emptyText">
+          画像をアップロードして<br>カットスタイルを選択し<br>「カットパスを生成」を押してください
+        </div>
+      </div>
+      <canvas id="previewCanvas"></canvas>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="status-chip">
+        <div class="status-led" id="statusLed"></div>
+        <span id="statusMsg" data-i18n="waiting">待機中</span>
+      </div>
+      <div class="stat-item" data-i18n-prefix="size">サイズ: <span id="statSize">—</span></div>
+      <div class="stat-item" data-i18n-prefix="pts">パス点数: <span id="statPts">—</span></div>
+      <div class="stat-item" data-i18n-prefix="style">スタイル: <span id="statStyle">—</span></div>
+      <button class="btn-dl-psd" id="dlBtn" onclick="downloadPSD()" disabled>
+        <span class="psd-badge">PSD</span>
+        <span data-i18n="download">ダウンロード</span>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /appPage -->
+
+<!-- ══════════════════════════════════════
+     SUPPORT SECTION (常時表示)
+══════════════════════════════════════ -->
+<div id="supportSection">
+
+  <div class="support-hero">
+    <span class="support-emoji">☕</span>
+    <h1 class="support-title" id="supportTitle">かっとぱす<em>！</em>を<br>応援してください ☕</h1>
+    <p class="support-sub" id="supportSubText">
+      このサービスは完全無料・広告なしで運営しています。<br>
+      コーヒー一杯分の支援が、開発の大きな励みになります！
+    </p>
+    <p class="support-note" id="supportNote">決済はStripeで安全に処理されます</p>
+  </div>
+
+  <div class="support-cards">
+
+    <!-- One-time -->
+    <div class="support-card">
+      <div class="support-card-badge badge-once" data-i18n="badgeOnce">一回かぎり</div>
+      <span class="support-card-icon">☕</span>
+      <h2 class="support-card-title" id="card1Title">コーヒーを<br>おごってください！</h2>
+      <p class="support-card-desc" id="card1Desc">
+        「使えたよ！」という気持ちを<br>
+        コーヒー一杯で伝えてもらえると<br>
+        とっても嬉しいです☻
+      </p>
+      <div class="support-card-price">¥500</div>
+      <div class="support-card-price-sub" data-i18n="oneTime">1回のみ</div>
+      <button class="btn-stripe btn-stripe-once" onclick="openStripe('once')">
+        <span id="btn1Text">☕ コーヒーをおごる</span>
+        <span class="stripe-lock">🔒</span>
+      </button>
+    </div>
+
+    <!-- Monthly -->
+    <div class="support-card">
+      <div class="support-card-badge badge-monthly" data-i18n="badgeMonthly">月ごと</div>
+      <span class="support-card-icon">🗓️</span>
+      <h2 class="support-card-title" id="card2Title">コーヒー記念日を<br>決めてあげる！</h2>
+      <p class="support-card-desc" id="card2Desc">
+        毎月コーヒーを一杯おごってくれる<br>
+        あなたの日を「コーヒー記念日」に。<br>
+        毎月ありがとうの気持ちで開発します☻
+      </p>
+      <div class="support-card-price">¥500<span style="font-size:14px;color:var(--ink2)">/月</span></div>
+      <div class="support-card-price-sub" data-i18n="monthly">毎月自動更新・いつでも解約OK</div>
+      <button class="btn-stripe btn-stripe-monthly" onclick="openStripe('monthly')">
+        <span id="btn2Text">🗓️ 記念日を決める</span>
+        <span class="stripe-lock">🔒</span>
+      </button>
+    </div>
+
+  </div>
+
+  <div class="stripe-info-box">
+    <div class="stripe-info">
+      <span class="stripe-info-icon">ℹ️</span>
+      <div class="stripe-info-text" id="stripeInfoText">
+        <strong>Stripeについて：</strong>
+        決済はStripe社のシステムを使用しています。カード情報はStripeが安全に管理し、このサービスには一切保存されません。
+        月額プランはStripeダッシュボードからいつでも解約できます。
+      </div>
+    </div>
+  </div>
+
+  <div class="support-footer">
+    <p class="support-footer-text" id="supportFooterText">
+      支援していただいたお金は、サーバー代・ドメイン代・開発時間に使わせていただきます。<br>
+      かっとぱす！を使ってくださっているすべての方に感謝します ✂️
+    </p>
+  </div>
+
+</div><!-- /supportSection -->
+
+<div class="toast" id="toast"></div>
+<canvas id="workCanvas" style="display:none"></canvas>
+
+<script>
+// ═══════════════════════════════════════
+// i18n
+// ═══════════════════════════════════════
+const LANG = {
+  ja: {
+    headerTitle: 'かっとぱす！',
+    headerTagline: 'ステッカーのカットパスを自動出力',
+    tabApp: 'アプリ',
+    tabSupport: '☕ 支援ページ',
+    supportBtn: '支援する',
+    label1: '画像をアップロード',
+    label2: 'カットスタイル',
+    label3: 'PSDレイヤー構成',
+    dzMain: 'ドラッグ＆ドロップ',
+    dzSub: 'PNG / JPG / WebP<br>透過PNG推奨',
+    styleTight: 'タイト',
+    styleTightDesc: '輪郭ぴったり<br>高精度トレース',
+    styleBleed: '余白あり',
+    styleBleedDesc: 'ブリード拡張<br>安全マージン付き',
+    styleRound: '角丸',
+    styleRoundDesc: '丸みのある<br>やさしい輪郭',
+    styleRect: '矩形',
+    styleRectDesc: 'バウンディング<br>ボックス',
+    sliderBleed: '拡張量（ブリード）',
+    sliderAlpha: 'アルファ閾値',
+    sliderSmooth: 'パスの滑らかさ',
+    sliderCorner: '角丸の半径',
+    sliderStroke: 'パスの線幅',
+    layerCut: 'カットパス',
+    layerOrig: '元画像',
+    layerBg: '背景',
+    genBtn: '▶ カットパスを生成',
+    preview: 'プレビュー',
+    viewOverlay: 'OVERLAY',
+    viewImage: 'IMAGE',
+    viewPath: 'PATH',
+    waiting: '待機中',
+    download: 'ダウンロード',
+    statSize: 'サイズ',
+    statPts: 'パス点数',
+    statStyle: 'スタイル',
+    styleNames: { tight:'タイト', bleed:'余白あり', round:'角丸', rect:'矩形' },
+    supportTitle: 'かっとぱす！を<br>応援してください',
+    supportSub: 'このサービスは完全無料・広告なしで運営しています。<br>コーヒー一杯分の支援が、開発の大きな励みになります！',
+    supportNote: '決済はStripeで安全に処理されます',
+    badgeOnce: '一回かぎり',
+    badgeMonthly: '月ごと',
+    card1Title: 'コーヒーを<br>おごってください！',
+    card1Desc: '「使えたよ！」という気持ちを<br>コーヒー一杯で伝えてもらえると<br>とっても嬉しいです☻',
+    oneTime: '1回のみ',
+    card2Title: 'コーヒー記念日を<br>決めてあげる！',
+    card2Desc: '毎月コーヒーを一杯おごってくれる<br>あなたの日を「コーヒー記念日」に。<br>毎月ありがとうの気持ちで開発します☻',
+    monthly: '毎月自動更新・いつでも解約OK',
+    btn1: '☕ コーヒーをおごる',
+    btn2: '🗓️ 記念日を決める',
+    stripeInfo: '<strong>Stripeについて：</strong>決済はStripe社のシステムを使用しています。カード情報はStripeが安全に管理し、このサービスには一切保存されません。月額プランはStripeダッシュボードからいつでも解約できます。',
+    supportFooter: '支援していただいたお金は、サーバー代・ドメイン代・開発時間に使わせていただきます。<br>かっとぱす！を使ってくださっているすべての方に感謝します ✂️',
+    emptyText: '画像をアップロードして<br>カットスタイルを選択し<br>「カットパスを生成」を押してください',
+    statusReady: 'カットパス生成完了 — PSDダウンロード可能',
+    statusGen: 'カットパスを計算中...',
+    statusLoaded: '画像を読み込みました — 設定して生成してください',
+    statusPsd: 'PSDを生成中...',
+    toastPsd: '✓ PSDをダウンロードしました',
+    toastPsdDone: 'PSDダウンロード完了',
+    toastPng: 'PNG（代替）をダウンロードしました',
+  },
+  en: {
+    headerTitle: 'CutPass!',
+    headerTagline: 'Auto Cut Path Generator for Stickers',
+    tabApp: 'App',
+    tabSupport: '☕ Support',
+    supportBtn: 'Support',
+    label1: 'Upload Image',
+    label2: 'Cut Style',
+    label3: 'PSD Layer Structure',
+    dzMain: 'Drag & Drop',
+    dzSub: 'PNG / JPG / WebP<br>Transparent PNG recommended',
+    styleTight: 'Tight',
+    styleTightDesc: 'Precise outline<br>High accuracy trace',
+    styleBleed: 'Bleed',
+    styleBleedDesc: 'Expanded outline<br>With safety margin',
+    styleRound: 'Rounded',
+    styleRoundDesc: 'Soft rounded<br>Gentle outline',
+    styleRect: 'Rectangle',
+    styleRectDesc: 'Bounding box<br>Simple rect',
+    sliderBleed: 'Bleed Amount',
+    sliderAlpha: 'Alpha Threshold',
+    sliderSmooth: 'Path Smoothness',
+    sliderCorner: 'Corner Radius',
+    sliderStroke: 'Stroke Width',
+    layerCut: 'Cut Path',
+    layerOrig: 'Original Image',
+    layerBg: 'Background',
+    genBtn: '▶ Generate Cut Path',
+    preview: 'Preview',
+    viewOverlay: 'OVERLAY',
+    viewImage: 'IMAGE',
+    viewPath: 'PATH',
+    waiting: 'Waiting',
+    download: 'Download',
+    statSize: 'Size',
+    statPts: 'Path Points',
+    statStyle: 'Style',
+    styleNames: { tight:'Tight', bleed:'Bleed', round:'Rounded', rect:'Rectangle' },
+    supportTitle: 'Support CutPass!',
+    supportSub: 'This service is completely free with no ads.<br>Buying me a coffee makes a huge difference!',
+    supportNote: 'Payments are securely processed by Stripe',
+    badgeOnce: 'One-time',
+    badgeMonthly: 'Monthly',
+    card1Title: 'Buy me<br>a coffee!',
+    card1Desc: 'If CutPass! helped you,<br>treat me to a coffee<br>as a thank-you ☻',
+    oneTime: 'One time only',
+    card2Title: 'Make it your<br>Coffee Anniversary!',
+    card2Desc: 'Become a monthly supporter<br>and I\'ll celebrate your personal<br>"Coffee Anniversary" every month ☻',
+    monthly: 'Auto-renews monthly · Cancel anytime',
+    btn1: '☕ Buy a coffee',
+    btn2: '🗓️ Set my anniversary',
+    stripeInfo: '<strong>About Stripe:</strong> Payments are processed by Stripe. Your card info is managed securely by Stripe and is never stored on this service. Monthly plans can be cancelled anytime from the Stripe dashboard.',
+    supportFooter: 'Your support goes toward server costs, domain fees, and development time.<br>Thank you to everyone who uses CutPass! ✂️',
+    emptyText: 'Upload an image,<br>choose a cut style,<br>and press "Generate Cut Path"',
+    statusReady: 'Cut path ready — PSD download available',
+    statusGen: 'Generating cut path...',
+    statusLoaded: 'Image loaded — configure settings and generate',
+    statusPsd: 'Building PSD...',
+    toastPsd: '✓ PSD downloaded',
+    toastPsdDone: 'PSD download complete',
+    toastPng: 'PNG (fallback) downloaded',
+  }
+};
+
+let currentLang = 'ja';
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase().includes(lang));
+  });
+  applyLang();
+}
+
+function t(key) {
+  return LANG[currentLang][key] || LANG['ja'][key] || key;
+}
+
+function applyLang() {
+  const L = LANG[currentLang];
+  // Header
+  document.getElementById('headerTitle').innerHTML = currentLang === 'ja'
+    ? 'かっとぱす<em>！</em>' : 'CutPass<em>!</em>';
+  document.getElementById('headerTagline').textContent = L.headerTagline;
+
+  // Sidebar labels
+  document.getElementById('label1').childNodes[document.getElementById('label1').childNodes.length-1].textContent = ' ' + L.label1;
+  document.getElementById('label2').childNodes[document.getElementById('label2').childNodes.length-1].textContent = ' ' + L.label2;
+  document.getElementById('label3').childNodes[document.getElementById('label3').childNodes.length-1].textContent = ' ' + L.label3;
+
+  // Drop zone
+  document.getElementById('dzMain').textContent = L.dzMain;
+  document.getElementById('dzSub').innerHTML = L.dzSub;
+
+  // Cut cards
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (L[key] !== undefined) el.innerHTML = L[key];
+  });
+
+  // Sliders
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (L[key]) el.innerHTML = L[key];
+  });
+
+  // Gen button
+  document.querySelector('.btn-label').textContent = L.genBtn;
+
+  // Empty text
+  document.getElementById('emptyText').innerHTML = L.emptyText;
+
+  // Bottom bar labels
+  const statEls = document.querySelectorAll('.stat-item');
+  if (statEls[0]) statEls[0].innerHTML = L.statSize + ': <span id="statSize">' + (document.getElementById('statSize')?.textContent || '—') + '</span>';
+  if (statEls[1]) statEls[1].innerHTML = L.statPts + ': <span id="statPts">' + (document.getElementById('statPts')?.textContent || '—') + '</span>';
+  if (statEls[2]) statEls[2].innerHTML = L.statStyle + ': <span id="statStyle">' + (document.getElementById('statStyle')?.textContent || '—') + '</span>';
+
+  // Support page
+  document.getElementById('supportTitle').innerHTML = L.supportTitle;
+  document.getElementById('supportSubText').innerHTML = L.supportSub;
+  document.getElementById('supportNote').textContent = L.supportNote;
+  document.getElementById('card1Title').innerHTML = L.card1Title;
+  document.getElementById('card1Desc').innerHTML = L.card1Desc;
+  document.getElementById('card2Title').innerHTML = L.card2Title;
+  document.getElementById('card2Desc').innerHTML = L.card2Desc;
+  document.getElementById('btn1Text').textContent = L.btn1;
+  document.getElementById('btn2Text').textContent = L.btn2;
+  document.getElementById('stripeInfoText').innerHTML = L.stripeInfo;
+  document.getElementById('supportFooterText').innerHTML = L.supportFooter;
+
+  // Style names in stat
+  if (currentStyle) {
+    const nameEl = document.getElementById('statStyle');
+    if (nameEl) nameEl.textContent = L.styleNames[currentStyle] || currentStyle;
+  }
+}
+
+// ═══════════════════════════════════════
+// Stripe
+// ═══════════════════════════════════════
+function openStripe(type) {
+  // ⚠️ ここにStripeのPayment LinkのURLを設定してください
+  // Stripe Dashboard → Payment Links で作成できます
+  const links = {
+    once:    'https://buy.stripe.com/6oU5kw9MW1zk1n56oRbfO01',    // 一回限り ¥500
+    monthly: 'https://buy.stripe.com/eVqbIU4sC1zkc1J4gJbfO02', // 月額 ¥500
+  };
+  const url = links[type];
+  if (url.includes('YOUR_')) {
+    showToast(currentLang === 'ja'
+      ? 'Stripe Payment LinkのURLを設定してください'
+      : 'Please set your Stripe Payment Link URL');
+    return;
+  }
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════
+// App logic (same as before, i18n-aware)
+// ═══════════════════════════════════════
+let imgEl = null;
+let currentStyle = 'tight';
+let currentView = 'overlay';
+let currentPathData = null;
+let zoomLevel = 1;
+let regenTimer = null;
+let psdLib = null;
+
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('fileInput');
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]); });
+fi.addEventListener('change', e => { if(e.target.files[0]) loadImage(e.target.files[0]); });
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      imgEl = img;
+      document.getElementById('thumbImg').src = ev.target.result;
+      document.getElementById('thumbSize').textContent = img.width + '×' + img.height;
+      document.getElementById('thumbFmt').textContent = file.type.replace('image/','').toUpperCase();
+      document.getElementById('imgThumb').style.display = 'block';
+      document.getElementById('genBtn').disabled = false;
+      setStep(1);
+      setStatus('', t('statusLoaded'));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectStyle(el, style) {
+  document.querySelectorAll('.cut-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  currentStyle = style;
+  document.getElementById('rowBleed').style.display = style === 'bleed' ? 'block' : 'none';
+  document.getElementById('rowCorner').style.display = style === 'round' ? 'block' : 'none';
+  scheduleRegen();
+}
+
+function scheduleRegen() {
+  if (!imgEl) return;
+  clearTimeout(regenTimer);
+  regenTimer = setTimeout(generate, 400);
+}
+
+function generate() {
+  if (!imgEl) return;
+  const btn = document.getElementById('genBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  setStatus('working', t('statusGen'));
+  setTimeout(() => {
+    try { _doGenerate(); }
+    catch(e) { console.error(e); }
+    finally { btn.classList.remove('loading'); btn.disabled = false; }
+  }, 20);
+}
+
+function _doGenerate() {
+  const alphaThreshold = parseInt(document.getElementById('rAlpha').value);
+  const smoothness = parseInt(document.getElementById('rSmooth').value);
+  const bleed = parseInt(document.getElementById('rBleed').value);
+  const cornerR = parseInt(document.getElementById('rCorner').value);
+  const W = imgEl.width, H = imgEl.height;
+
+  const wc = document.getElementById('workCanvas');
+  wc.width = W; wc.height = H;
+  const ctx = wc.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(imgEl,0,0);
+  const imgData = ctx.getImageData(0,0,W,H);
+  const px = imgData.data;
+
+  const mask = new Uint8Array(W * H);
+  let hasTransparency = false;
+  for (let i=0; i<W*H; i++) {
+    const a = px[i*4+3];
+    if (a < 255) hasTransparency = true;
+    mask[i] = a > alphaThreshold ? 1 : 0;
+  }
+  if (!hasTransparency) {
+    for (let i=0; i<W*H; i++) {
+      const r=px[i*4], g=px[i*4+1], b=px[i*4+2];
+      mask[i] = (0.299*r + 0.587*g + 0.114*b) < 235 ? 1 : 0;
+    }
+  }
+
+  const cleanMask = morphClean(mask, W, H);
+  let svgPath = '', pointCount = 0;
+
+  if (currentStyle === 'rect') {
+    const bb = getBBox(cleanMask, W, H);
+    svgPath = rectPath(bb.x, bb.y, bb.w, bb.h, 0);
+    pointCount = 4;
+  } else if (currentStyle === 'round') {
+    const bb = getBBox(cleanMask, W, H);
+    svgPath = rectPath(bb.x-4, bb.y-4, bb.w+8, bb.h+8, cornerR);
+    pointCount = 8;
+  } else {
+    const traceMask = currentStyle === 'bleed' ? dilate(cleanMask, W, H, bleed) : cleanMask;
+    const contour = traceContour(traceMask, W, H);
+    pointCount = contour.length;
+    if (contour.length > 0) svgPath = toSVGPath(simplify(contour, smoothness));
+  }
+
+  currentPathData = { svgPath, pointCount };
+
+  document.getElementById('statSize').textContent = W + '×' + H;
+  document.getElementById('statPts').textContent = pointCount;
+  document.getElementById('statStyle').textContent = LANG[currentLang].styleNames[currentStyle];
+
+  renderPreview();
+  document.getElementById('dlBtn').disabled = false;
+  document.getElementById('emptyPh').style.display = 'none';
+  document.getElementById('previewCanvas').style.display = 'block';
+  setStep(2);
+  setStatus('ready', t('statusReady'));
+}
+
+function morphClean(mask, W, H) {
+  const out = new Uint8Array(mask);
+  const temp = new Uint8Array(W * H);
+  for (let y=1; y<H-1; y++) for (let x=1; x<W-1; x++) {
+    if (mask[y*W+x] && mask[(y-1)*W+x] && mask[(y+1)*W+x] && mask[y*W+x-1] && mask[y*W+x+1])
+      temp[y*W+x] = 1;
+  }
+  for (let y=1; y<H-1; y++) for (let x=1; x<W-1; x++) {
+    out[y*W+x] = (temp[y*W+x]||(x>0&&temp[y*W+x-1])||(x<W-1&&temp[y*W+x+1])||
+      (y>0&&temp[(y-1)*W+x])||(y<H-1&&temp[(y+1)*W+x])) ? 1 : 0;
+  }
+  return out;
+}
+
+function dilate(mask, W, H, r) {
+  const out = new Uint8Array(W * H);
+  const r2 = r * r;
+  for (let y=0; y<H; y++) for (let x=0; x<W; x++) {
+    if (mask[y*W+x]) { out[y*W+x]=1; continue; }
+    outer: for (let dy=-r; dy<=r; dy++) for (let dx=-r; dx<=r; dx++) {
+      if (dx*dx+dy*dy > r2) continue;
+      const nx=x+dx, ny=y+dy;
+      if (nx>=0&&nx<W&&ny>=0&&ny<H&&mask[ny*W+nx]) { out[y*W+x]=1; break outer; }
+    }
+  }
+  return out;
+}
+
+function getBBox(mask, W, H) {
+  let minX=W,maxX=0,minY=H,maxY=0;
+  for (let y=0;y<H;y++) for(let x=0;x<W;x++) {
+    if (!mask[y*W+x]) continue;
+    if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y;
+  }
+  return {x:minX, y:minY, w:maxX-minX, h:maxY-minY};
+}
+
+function rectPath(x,y,w,h,r) {
+  x=Math.max(0,x); y=Math.max(0,y);
+  if (r<=0) return `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`;
+  r=Math.min(r,w/2,h/2);
+  return `M${x+r},${y} L${x+w-r},${y} Q${x+w},${y} ${x+w},${y+r} L${x+w},${y+h-r} Q${x+w},${y+h} ${x+w-r},${y+h} L${x+r},${y+h} Q${x},${y+h} ${x},${y+h-r} L${x},${y+r} Q${x},${y} ${x+r},${y} Z`;
+}
+
+function traceContour(mask, W, H) {
+  let startX=-1, startY=-1;
+  outer: for (let y=0;y<H;y++) for(let x=0;x<W;x++) {
+    if (mask[y*W+x] && !isInsideAll(x,y,mask,W,H)) { startX=x; startY=y; break outer; }
+  }
+  if (startX<0) return [];
+  const dirs=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+  const points=[];
+  let cx=startX, cy=startY, dir=6, limit=W*H*2;
+  do {
+    points.push([cx,cy]);
+    for (let i=0;i<8;i++) {
+      const nd=(dir+6+i)%8, [dx,dy]=dirs[nd], nx=cx+dx, ny=cy+dy;
+      if (nx>=0&&nx<W&&ny>=0&&ny<H&&mask[ny*W+nx]) { cx=nx; cy=ny; dir=nd; break; }
+    }
+    limit--;
+  } while ((cx!==startX||cy!==startY)&&limit>0&&points.length<10000);
+  return points;
+}
+
+function isInsideAll(x,y,mask,W,H) {
+  return (x>0&&mask[y*W+x-1])&&(x<W-1&&mask[y*W+x+1])&&
+         (y>0&&mask[(y-1)*W+x])&&(y<H-1&&mask[(y+1)*W+x]);
+}
+
+function simplify(pts, tolerance) {
+  if (pts.length < 3) return pts;
+  return rdp(pts, Math.max(0.5, tolerance * 0.8));
+}
+
+function rdp(pts, eps) {
+  if (pts.length <= 2) return pts;
+  let maxDist=0, idx=0;
+  const start=pts[0], end=pts[pts.length-1];
+  for (let i=1;i<pts.length-1;i++) {
+    const d=pointLineDistance(pts[i],start,end);
+    if (d>maxDist) { maxDist=d; idx=i; }
+  }
+  if (maxDist > eps) {
+    const l=rdp(pts.slice(0,idx+1),eps);
+    const r=rdp(pts.slice(idx),eps);
+    return [...l.slice(0,-1),...r];
+  }
+  return [start,end];
+}
+
+function pointLineDistance([px,py],[ax,ay],[bx,by]) {
+  const dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy;
+  if (len2===0) return Math.hypot(px-ax,py-ay);
+  const tc=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/len2));
+  return Math.hypot(px-ax-tc*dx, py-ay-tc*dy);
+}
+
+function toSVGPath(pts) {
+  if (pts.length < 3) return '';
+  const n=pts.length, alpha=0.25;
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for (let i=0;i<n;i++) {
+    const p0=pts[(i-1+n)%n], p1=pts[i], p2=pts[(i+1)%n], p3=pts[(i+2)%n];
+    const cp1x=p1[0]+(p2[0]-p0[0])*alpha, cp1y=p1[1]+(p2[1]-p0[1])*alpha;
+    const cp2x=p2[0]-(p3[0]-p1[0])*alpha, cp2y=p2[1]-(p3[1]-p1[1])*alpha;
+    d+=` C${f(cp1x)},${f(cp1y)} ${f(cp2x)},${f(cp2y)} ${p2[0]},${p2[1]}`;
+  }
+  return d + ' Z';
+}
+
+function f(n) { return Math.round(n*10)/10; }
+
+function renderPreview() {
+  if (!imgEl||!currentPathData) return;
+  const cvs=document.getElementById('previewCanvas');
+  const W=imgEl.width, H=imgEl.height;
+  cvs.width=W; cvs.height=H;
+  const ctx=cvs.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if (currentView !== 'path') ctx.drawImage(imgEl,0,0);
+  if (currentView !== 'image' && currentPathData.svgPath) {
+    const path=new Path2D(currentPathData.svgPath);
+    const sw=parseInt(document.getElementById('rStroke').value);
+    ctx.fillStyle='rgba(232,56,13,0.12)'; ctx.fill(path);
+    ctx.strokeStyle='#e8380d'; ctx.lineWidth=sw; ctx.lineJoin='round'; ctx.setLineDash([]); ctx.stroke(path);
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.setLineDash([8,6]); ctx.stroke(path);
+    ctx.setLineDash([]);
+  }
+  applyZoom();
+}
+
+function zoom(delta) { zoomLevel=Math.max(0.1,Math.min(4,zoomLevel+delta)); applyZoom(); }
+function resetZoom() { zoomLevel=1; applyZoom(); }
+function applyZoom() {
+  document.getElementById('previewCanvas').style.transform=`scale(${zoomLevel})`;
+  document.getElementById('zoomVal').textContent=Math.round(zoomLevel*100)+'%';
+}
+
+function setView(v, el) {
+  currentView=v;
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  if (currentPathData) renderPreview();
+}
+
+function downloadPSD() {
+  if (!currentPathData||!imgEl) return;
+  setStatus('working', t('statusPsd'));
+  document.getElementById('dlBtn').disabled=true;
+  if (psdLib) { _buildPSD(); return; }
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/ag-psd@14/dist/bundle.js';
+  s.onload=()=>{ psdLib=true; _buildPSD(); };
+  s.onerror=()=>{ showToast('Library load error'); fallbackPNG(); };
+  document.head.appendChild(s);
+}
+
+function _buildPSD() {
+  const writePsd=window.agPsd&&window.agPsd.writePsd;
+  if (!writePsd) { fallbackPNG(); return; }
+  const W=imgEl.width, H=imgEl.height;
+  const sw=parseInt(document.getElementById('rStroke').value);
+  const pathCvs=document.createElement('canvas');
+  pathCvs.width=W; pathCvs.height=H;
+  const pctx=pathCvs.getContext('2d');
+  if (currentPathData.svgPath) {
+    pctx.strokeStyle='#e8380d'; pctx.lineWidth=sw*2; pctx.lineJoin='round';
+    pctx.stroke(new Path2D(currentPathData.svgPath));
+  }
+  const imgCvs=document.createElement('canvas');
+  imgCvs.width=W; imgCvs.height=H;
+  imgCvs.getContext('2d').drawImage(imgEl,0,0);
+  try {
+    const buf=writePsd({
+      width:W, height:H,
+      children:[
+        { name:'Cut Path (カットパス)', canvas:pathCvs, top:0, left:0, bottom:H, right:W, opacity:255 },
+        { name:'Original (元画像)',     canvas:imgCvs,  top:0, left:0, bottom:H, right:W, opacity:255 },
+      ]
+    }, { generateThumbnail:true, trimImageData:false });
+    triggerDownload(new Blob([buf],{type:'application/octet-stream'}), 'cutpass_output.psd');
+    showToast(t('toastPsd'));
+    setStatus('ready', t('toastPsdDone'));
+    setStep(3);
+  } catch(e) { console.error(e); fallbackPNG(); }
+  document.getElementById('dlBtn').disabled=false;
+}
+
+function fallbackPNG() {
+  document.getElementById('previewCanvas').toBlob(blob=>{
+    triggerDownload(blob,'cutpass_preview.png');
+    showToast(t('toastPng'));
+    setStatus('',''); document.getElementById('dlBtn').disabled=false;
+  });
+}
+
+function triggerDownload(blob, name) {
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+function setStatus(state, msg) {
+  document.getElementById('statusLed').className='status-led '+state;
+  document.getElementById('statusMsg').textContent=msg;
+}
+
+function setStep(n) {
+  ['sd1','sd2','sd3'].forEach((id,i)=>{
+    document.getElementById(id).className='step-dot'+(i<n?' done':'')+(i===n?' active':'');
+  });
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// init
+applyLang();
+</script>
+</body>
+</html>
